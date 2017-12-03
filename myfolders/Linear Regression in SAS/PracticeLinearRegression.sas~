@@ -1,0 +1,208 @@
+libname s "~/Linear Regression in SAS/";
+run;
+
+proc contents data=s.car_sales varnum;
+run;
+
+proc means data=s.car_sales N Nmiss mean std min P1 P10 P25 P50 P75 P95 P99 Max;
+run;
+
+/* Outlier Treatment */
+/* Outlier Capping */
+data CarSales;
+set s.car_sales;
+if Sales_in_thousands > 257.0863424 Then Sales_in_thousands = 257.0863424;
+if __year_resale_value > 52.4331275 Then __year_resale_value = 52.4331275;
+if Price_in_thousands > 70.4457144 Then Price_in_thousands = 70.4457144;
+if Engine_size > 6.1948564 Then Engine_size = 6.1948564;
+if Horsepower > 356.0496806 Then Horsepower = 356.0496806;
+if Wheelbase > 130.4110885 Then Wheelbase = 130.4110885;
+if Width > 81.5056157 Then Width = 81.5056157;
+if Length > 227.6388526 Then Length = 227.6388526;
+if Curb_weight > 5.2695306 Then Curb_weight = 5.2695306;
+if Fuel_capacity > 29.615687 Then Fuel_capacity = 29.615687;
+if Fuel_efficiency > 36.6922726 Then Fuel_efficiency = 36.6922726;
+if Vehicle_Dummy > 2.0608491 Then Vehicle_Dummy = 2.0608491;
+run;
+
+proc means data=CarSales N Nmiss;
+run;
+
+/* Missing Value Treatment */
+/* Mean Imputations */
+
+Data CarSales;
+set CarSales;
+if Sales_in_thousands = . Then Sales_in_thousands = 52.9980764;
+if __year_resale_value = . Then __year_resale_value = 18.0729752;
+if Price_in_thousands = . Then Price_in_thousands = 27.3907548;
+if Engine_size = . Then Engine_size = 3.0608974;
+if Horsepower = . Then Horsepower = 185.9487179;
+if Wheelbase = . Then Wheelbase = 107.4871795;
+if Width = . Then Width = 71.15;
+if Length = . Then Length = 187.3435897;
+if Curb_weight = . Then Curb_weight = 3.3780258;
+if Fuel_capacity = . Then Fuel_capacity = 17.9519231;
+if Fuel_efficiency = . Then Fuel_efficiency = 23.8441558;
+if Vehicle_Dummy = . Then Vehicle_Dummy = 0.7388535;
+run;
+
+/* Vehicle_Type Relation with Sales_In_Thousands */
+proc anova data=carsales;
+class Vehicle_Type;
+model Sales_In_Thousands = Vehicle_Type;
+run;
+
+/* Dummy Variable creation */
+data carsales;
+set carsales;
+if vehicle_type="Car" then Vehicle_dummy=0; else Vehicle_dummy=1;
+run;
+
+/* Checking Normality for the Sales_In_Thousands */
+proc univariate data=carsales;
+var sales_in_thousands;
+histogram;
+run;
+
+/* Log transformation for the Sales_In_Thousands */
+data carsales;
+set carsales;
+ln_sales_in_thousands=log(sales_in_thousands);
+run;
+
+/* Comparing both variables */
+proc univariate data=carsales;
+var sales_in_thousands ln_sales_in_thousands;
+histogram;
+run;
+
+data carsales;
+set carsales;
+if ln_sales_in_thousands <=-0.5 then ln_sales_in_thousands = -0.5;
+/*if ln_sales <=-0.5 then delete;*/
+run;
+
+proc univariate data=carsales;
+var ln_sales_in_thousands;
+histogram;
+run;
+
+/* Linear Relationship Between X and Y Variables */
+
+proc corr data=carsales no noprob;
+var ln_sales_in_thousands
+__year_resale_value
+Price_in_thousands
+Engine_size	/*drop*/
+Horsepower	/*drop*/
+Wheelbase
+Width	/*drop*/
+Length	/*drop*/
+Curb_weight	/*drop*/
+Fuel_capacity /*drop*/
+Fuel_efficiency
+Vehicle_Dummy
+Power_perf_factor; /*drop*/
+run;
+
+/* Development and Validation Dataset */
+proc surveyselect data=carsales out=carsales seed=123 samprate=0.7 outall;
+run;
+
+data dev val;
+set carsales;
+if selected=1 then output dev;
+else output val;
+run;
+
+Proc reg data=dev outest=reg_est;
+model ln_sales_in_thousands=price_in_thousands
+wheelbase 
+fuel_efficiency 
+vehicle_dummy /VIF STB;
+run;
+
+proc reg data=dev outest=reg_est;;
+model Ln_sales_in_thousands=price_in_thousands
+/* engine_size */
+/* horsepower */
+wheelbase
+/* width */
+/* length */
+/* curb_weight */
+/* fuel_capacity */
+fuel_efficiency
+Vehicle_dummy / selection = stepwise VIF STB;
+output out=dev1 p=Ln_pre_sales;
+run;
+
+proc reg data=dev outest=reg_est;;
+model Ln_sales_in_thousands=price_in_thousands wheelbase fuel_efficiency Vehicle_dummy/ VIF STB;
+output out=dev1 p=Ln_pre_sales;
+run;
+
+
+/* Decile Analysis */
+
+data dev1;
+set dev1;
+Pre_sales=Exp(Ln_pre_sales);
+run;
+
+proc rank data=dev1 out=dev2 ties=low 
+ descending groups=10; 
+ var Pre_sales; 
+ ranks Decile; 
+run; 
+
+proc means data=dev2 ;  
+ class Decile; 
+ var Sales_in_thousands Pre_sales; 
+ output out=report 
+ mean=actualavg predicted_avg; 
+run;
+
+
+/*Decile analysis for validation data set */
+/*Validation (scoring)*/
+
+/*Method-1 - using equation*/
+
+data val1;
+set val;
+Ln_pre_sales=((price_in_thousands*-0.05149) + (fuel_efficiency*0.01441) +
+(wheelbase*0.04709)+ (Vehicle_dummy*-0.56098))-0.27747;
+Pre_sales=Exp(Ln_pre_sales);
+run;
+
+proc rank data=val1 out=val2 ties=low 
+ descending groups=10; 
+ var Pre_sales; 
+ ranks Decile; 
+run;
+
+proc means data=val2 ;  
+ class Decile; 
+ var Sales_in_thousands Pre_sales; 
+ output out=report 
+ mean=actualavg predicted_avg; 
+run;
+
+/*Method-2 using proc score*/
+proc score data=val score=reg_est out =val1 TYPE=PARMS;
+var price_in_thousands fuel_efficiency wheelbase Vehicle_dummy;
+run;
+
+proc rank data=val1 out=val2 ties=low 
+ descending groups=10; 
+ var Pre_sales; 
+ ranks Decile; 
+run; 
+
+proc means data=val2 ;  
+ class Decile; 
+ var Sales_in_thousands Pre_sales; 
+ output out=report 
+ mean=actualavg predicted_avg; 
+run; 

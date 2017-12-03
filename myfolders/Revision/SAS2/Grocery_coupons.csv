@@ -1,0 +1,15 @@
+storeid,Store ID
+hlthfood,Health food store
+size,Size of store
+org,Store organization
+custid,Customer ID
+gender,Gender
+shopfor,Who shopping for
+veg,Vegetarian
+style,Shopping style
+usecoup,Use coupons
+week,Week
+seq,Sequence
+carry,Carryover
+coupval,Value of coupon
+amtspent,Amount spent
