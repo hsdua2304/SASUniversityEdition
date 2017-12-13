@@ -20,7 +20,7 @@ run;
 proc contents data=regcs2.ecom varnum;
 run;
 
-proc means data=regcs2.ecom n nmiss mean std min P1 P5 P50 P95 P99 max;
+proc means data=regcs2.ecom n nmiss mean std min P1 P5 P25 P50 P75 P95 P99 max skew;
 run;
 
 proc freq data=regcs2.ecom;
@@ -45,13 +45,13 @@ run;
 
 DATA ecom;
 set ecom;
-if session_length_seconds > 357137.5 then session_length_seconds = 357137.5;
-if session_count > 465.5 then session_count = 465.5;
-if event_count > 6603 then event_count = 6603;
-if closed_session_event_count > 896 then closed_session_event_count = 896;
-if open_session_event_count > 895 then open_session_event_count = 895;
-if quest_completed_event_count > 3090.5 then quest_completed_event_count = 3090.5;
-if store_purchase_event_count > 71.5 then store_purchase_event_count = 71.5;
+if session_length_seconds > 160085.5 then session_length_seconds = 160085.5;
+if session_count > 286 then session_count = 286;
+if event_count > 3032.5 then event_count = 3032.5;
+if closed_session_event_count > 484 then closed_session_event_count = 484;
+if open_session_event_count > 484 then open_session_event_count = 484;
+if quest_completed_event_count > 957.5 then quest_completed_event_count = 957.5;
+if store_purchase_event_count > 20 then store_purchase_event_count = 20;
 run;
 
 /* proc means data=ecom n nmiss mean std min P1 P5 P50 P95 P99 max; */
@@ -75,8 +75,6 @@ quest_completed_event_count
 store_purchase_event_count;
 run;
 
-
-
 /* -------------------------------------------------------- */
 /* Spliting Data into Training and Testing Dataset */
 
@@ -88,6 +86,28 @@ set ecom;
 if selected=1 then output train;
 else output test;
 run;
+
+data Linear_train Linear_test;
+set ecom;
+if selected=1 then output Linear_train;
+else output Linear_test;
+run;
+/* ------------------------------------------------------------- */
+/* Linear Regression */
+
+proc reg data=Linear_train outest=Linear_reg_est Plots(Maxpoints=10000);
+model store_purchase_event_count=
+/* session_length_seconds */
+session_count
+event_count
+closed_session_event_count
+/* open_session_event_count */
+quest_completed_event_count
+active_days
+/* churnStatus*/ / VIF STB;
+output out=Linear_pred p=pre_salesCount;
+run;
+
 
 /* -------------------------------------------------------------- */
 /* Training Dataset */
