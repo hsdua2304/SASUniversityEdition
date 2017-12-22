@@ -124,6 +124,7 @@ var pre_salesCount;
 ranks Linear_decile;
 run;
 
+/* Scoring the Testing dataset */
 proc score data=test score=Linear_reg_est out =Linear_Test_pred TYPE=PARMS;
 var session_length_seconds
 session_count
@@ -138,6 +139,7 @@ set linear_test_pred;
 pre_salesCount=Model1;
 run;
 
+/* Decile Analysis for Testing DataSet */
 proc rank data=Linear_Test_pred out=Linear_Test_Decile ties=low descending groups=10;
 var pre_salesCount;
 ranks Linear_test_decile;
@@ -148,17 +150,6 @@ class Linear_Test_decile;
 var store_purchase_event_count pre_salesCount;
 output out=report_Linear mean=actual_avg predicted_avg sum=Actual_Sum Predicted_Sum;
 run;
-
-
-
-
-
-
-
-
-
-
-
 
 /* -------------------------------------------------------------- */
 /* Logistic Regression */
